@@ -9,7 +9,7 @@ import { User } from './entities/user.entity';
 import { DatabaseService } from 'src/database/database.service';
 import { v4 } from 'uuid';
 
-const DB_KEY = 'user';
+const DB_KEY = 'users';
 
 @Injectable()
 export class UserService {
@@ -33,6 +33,7 @@ export class UserService {
 
   async findAll() {
     const users = await this.databaseService.findAll(DB_KEY);
+
     return users.map((user) => new User(user));
   }
 
