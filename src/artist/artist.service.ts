@@ -4,12 +4,20 @@ import { UpdateArtistDto } from './dto/update-artist.dto';
 import { v4 } from 'uuid';
 import { Artist } from './entities/artist.entity';
 import { DatabaseService } from 'src/database/database.service';
+import { TrackService } from 'src/track/track.service';
+import { AlbumService } from 'src/album/album.service';
+import { FavoritesService } from 'src/favorites/favorites.service';
 
 const DB_KEY = 'artists';
 
 @Injectable()
 export class ArtistService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly trackService: TrackService,
+    private readonly albumService: AlbumService,
+    private readonly favoritesService: FavoritesService,
+  ) {}
 
   async create(createArtistDto: CreateArtistDto) {
     const newArtist: Artist = {
@@ -56,10 +64,40 @@ export class ArtistService {
   }
 
   async remove(id: string) {
-    const isRemoved = await this.databaseService.remove(DB_KEY, id);
+    const removedArtist = await this.databaseService.remove(DB_KEY, id);
 
-    if (!isRemoved) throw new NotFoundException('Artist not found');
+    if (!removedArtist) throw new NotFoundException('Artist not found');
 
-    return isRemoved;
+    const tracks = await this.trackService.findAll();
+
+    const tracksForUpdate = tracks.filter(
+      (track) => track.artistId === removedArtist.id,
+    );
+
+    tracksForUpdate.forEach(async (track) => {
+      await this.trackService.update(track.id, { ...track, artistId: null });
+    });
+
+    const albums = await this.albumService.findAll();
+
+    const albumsForUpdate = albums.filter(
+      (album) => album.artistId === removedArtist.id,
+    );
+
+    albumsForUpdate.forEach(async (album) => {
+      await this.albumService.update(album.id, { ...album, artistId: null });
+    });
+
+    const favArtists = await this.favoritesService.findAllArtists();
+
+    const favArtistsForUpdate = favArtists.filter(
+      (artist) => artist.id === removedArtist.id,
+    );
+
+    favArtistsForUpdate.forEach(async (artist) => {
+      await this.favoritesService.removeArtist(artist.id);
+    });
+
+    return removedArtist;
   }
 }

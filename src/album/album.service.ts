@@ -4,12 +4,18 @@ import { UpdateAlbumDto } from './dto/update-album.dto';
 import { DatabaseService } from 'src/database/database.service';
 import { v4 } from 'uuid';
 import { Album } from './entities/album.entity';
+import { TrackService } from 'src/track/track.service';
+import { FavoritesService } from 'src/favorites/favorites.service';
 
 const DB_KEY = 'albums';
 
 @Injectable()
 export class AlbumService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly trackService: TrackService,
+    private readonly favoritesService: FavoritesService,
+  ) {}
 
   async create(createAlbumDto: CreateAlbumDto) {
     const newAlbum: Album = {
@@ -56,10 +62,30 @@ export class AlbumService {
   }
 
   async remove(id: string) {
-    const isRemoved = await this.databaseService.remove(DB_KEY, id);
+    const removedAlbum = await this.databaseService.remove(DB_KEY, id);
 
-    if (!isRemoved) throw new NotFoundException('Album not found');
+    if (!removedAlbum) throw new NotFoundException('Album not found');
 
-    return isRemoved;
+    const tracks = await this.trackService.findAll();
+
+    const tracksForUpdate = tracks.filter(
+      (track) => track.albumId === removedAlbum.id,
+    );
+
+    tracksForUpdate.forEach(async (track) => {
+      await this.trackService.update(track.id, { ...track, albumId: null });
+    });
+
+    const favAlbums = await this.favoritesService.findAllAlbums();
+
+    const favAlbumsForUpdate = favAlbums.filter(
+      (album) => album.id === removedAlbum.id,
+    );
+
+    favAlbumsForUpdate.forEach(async (album) => {
+      await this.favoritesService.removeAlbum(album.id);
+    });
+
+    return removedAlbum;
   }
 }

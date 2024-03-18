@@ -4,12 +4,16 @@ import { UpdateTrackDto } from './dto/update-track.dto';
 import { Track } from './entities/track.entity';
 import { DatabaseService } from 'src/database/database.service';
 import { v4 } from 'uuid';
+import { FavoritesService } from 'src/favorites/favorites.service';
 
 const DB_KEY = 'tracks';
 
 @Injectable()
 export class TrackService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly favoritesService: FavoritesService,
+  ) {}
 
   async create(createTrackDto: CreateTrackDto) {
     const newTrack: Track = {
@@ -56,10 +60,20 @@ export class TrackService {
   }
 
   async remove(id: string) {
-    const isRemoved = await this.databaseService.remove(DB_KEY, id);
+    const removedTrack = await this.databaseService.remove(DB_KEY, id);
 
-    if (!isRemoved) throw new NotFoundException('Track not found');
+    if (!removedTrack) throw new NotFoundException('Track not found');
 
-    return isRemoved;
+    const favTracks = await this.favoritesService.findAllTracks();
+
+    const favTracksForUpdate = favTracks.filter(
+      (track) => track.id === removedTrack.id,
+    );
+
+    favTracksForUpdate.forEach(async (track) => {
+      await this.favoritesService.removeTrack(track.id);
+    });
+
+    return removedTrack;
   }
 }

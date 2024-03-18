@@ -49,11 +49,13 @@ export class DatabaseService {
     const index = await this.findIndex(key, id);
 
     if (index !== -1) {
+      const entity = this.db[key][index];
+
       this.db[key].splice(index, 1);
 
-      return true;
+      return entity;
     }
 
-    return false;
+    return null;
   }
 }
